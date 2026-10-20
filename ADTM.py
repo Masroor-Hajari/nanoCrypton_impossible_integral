@@ -505,14 +505,15 @@ def Search(ptxVec: list, ctxVec: list, keyList1: list, keyList2: list, keyList3:
                                 C1 = Enc.Enc(ptxVec[1], MK, 6)
                                 temp = RF_Op.Sigma(C1, ctxVec[1])
                                 w1 = np.sum(temp)
-                                if w2 == 0:
+                                if w1 == 0:
                                     for n in range(0, 4):
-                                        num1 = 
-                                
-                                    keyString = "0x"
-                                    keyString += hexList[num1] 
-                                    keyString += hexList[num2]
-                                    keyString += hexList[num3]
+                                        num1 = (MK[n][2] % 2) * 8 + MK[n][3]
+                                        num3 = MK[n][0] * 2 + (MK[n][1] // 4)
+                                        num2 = (MK[n][1] % 4) * 4 + int(MK[n][2] // 2)
+                                        keyString = "0x"
+                                        keyString += hexList[num1] 
+                                        keyString += hexList[num2]
+                                        keyString += hexList[num3]
                                     print(f"Masterkey has been recovered. Key is: {keyString}")
                                     recoveryFlag = True
                                     break

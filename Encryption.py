@@ -27,13 +27,13 @@ Instruction:
   - For robust code, validate and convert inputs in callers or modify helpers to raise exceptions instead of printing.
 
 - Example:
-    P = np.array([[1,0,0,1],
-                  [0,1,0,1],
+    P = np.array([[1,2,0,1],
+                  [0,1,3,1],
                   [1,1,0,1],
-                  [1,0,0,0]], dtype=np.uint8)
-    MK = np.array([[0,0,0,0],
-                   [1,0,0,0],
-                   [0,1,1,1],
+                  [1,2,2,0]], dtype=np.uint8)
+    MK = np.array([[3,0,0,0],
+                   [1,2,0,3],
+                   [2,1,1,1],
                    [1,0,1,0]], dtype=np.uint8)
     C = Enc(P, MK, 12)  # returns np.ndarray (4,4) dtype=np.uint8
 
@@ -51,7 +51,7 @@ def Enc(P: np.uint8, MK: np.uint8, r: int) -> np.uint8:
         p, q = P.shape
         if type(r) != int or r < 1 or r > 12:
             raise TypeError("The third input must be an integer between 1 and 12.")
-        elif m != 4 or n != 4 or p != 4 or q != 4 or P.max() < 0 or P.min() > 1 or MK.max() < 0 or MK.min() > 1:
+        elif m != 4 or n != 4 or p != 4 or q != 4 or P.max() < 0 or P.min() > 3 or MK.max() < 0 or MK.min() > 3:
             raise ValueError("The first and second inputs must be a 4x4 matrices of nibbles.")
         else:
             RK = KS_Opr.Ext(MK, 0)
@@ -62,7 +62,7 @@ def Enc(P: np.uint8, MK: np.uint8, r: int) -> np.uint8:
                 RK = KS_Opr.Ext(KS, i)
                 Temp = X.copy()
                 X = RF_Opr.RF(Temp, RK)
-            KS = np.uint8(KS.copy())
+            KS = KS_Opr.Updt(KS.copy())
             RK = KS_Opr.Ext(KS, r)
             C = RF_Opr.LastRF(X, RK)
             return C.astype(np.uint8)

@@ -3,7 +3,7 @@ from Basic import Int2Crumb, CrumbXOR
 
 """
 Instruction:
-- This module implements round-function operators for 32-bit blocks for nanoCrypton blockcipher.
+- This module implements round-function operators for 48-bit blocks for nanoCrypton blockcipher.
 - Use numpy types: pass blocks as numpy.ndarray with shape (4,4) and dtype=np.uint8.
 - Functions check .dtype and .shape; plain Python ints/lists will cause TypeError. Convert inputs before calling: np.uint8(value) or np.array(value, dtype=np.uint8).
 - Functions print error messages on invalid input and may return None; callers should validate inputs and/or catch exceptions and not rely on printed output for control flow.
@@ -17,13 +17,13 @@ def SBOX(x: np.uint8, num: int) -> np.uint8:
     try:
         if x.dtype != np.uint8 or type(num) != int:
             raise TypeError("Inputs must be an integer number.")
-        elif x < 0 or x > 3 or num < 0 or num > 3:
-            raise ValueError("First Input must be between 0 and 3 and second one must be between 0 and 3.")
+        elif x < 0 or x > 15 or num < 0 or num > 3:
+            raise ValueError("First Input must be between 0 and 7 and second one must be between 0 and 3.")
         else:
-            sbox = np.array([[2, 0, 3, 1],
-                             [1, 2, 0, 3],
-                             [1, 3, 0, 2],
-                             [2, 0, 1, 3]], dtype=np.uint8)
+            sbox = np.array([[4, 7, 3, 0, 5, 2, 1, 6],
+                             [1, 4, 7, 2, 6, 0, 3, 5],
+                             [3, 6, 5, 2, 0, 4, 7, 1],
+                             [5, 0, 3, 6, 1, 7, 4, 2]], dtype=np.uint8)
             y = sbox[num][x]
             return y.astype(np.uint8)
 
@@ -31,6 +31,7 @@ def SBOX(x: np.uint8, num: int) -> np.uint8:
         print("Error: Invalid input type.", e1)
     except ValueError as e2:
         print("Error: Invalid input value.", e2)
+
 ###################################################################################################
 ####                                      Gamma operator                                       ####
 ###################################################################################################
@@ -39,8 +40,8 @@ def Gamma(X: np.uint8) -> np.uint8:
     try:
         if m != 4 or n != 4:
             raise TypeError("Each block must be a 4x4 matrix of binary values.")
-        elif X.max() > 3 or X.min() < 0:
-            raise ValueError("Each element of the block must be a a value between 0 and 3.")
+        elif X.max() > 7 or X.min() < 0:
+            raise ValueError("Each element of the block must be a a value between 0 and 7.")
         else:
             Y = np.array([
                 [0, 0, 0, 0],
@@ -50,10 +51,8 @@ def Gamma(X: np.uint8) -> np.uint8:
                 ], dtype = np.uint8)
             for i in range(0, 4):
                 for j in range(0, 4):
-                    inNum = X[i][j]
                     num = (i + j) % 4
-                    outNum = SBOX(inNum, num)
-                    Y[i][j] = outNum
+                    Y[i][j] = SBOX(X[i][j], num)
             return Y.astype(np.uint8)
 
     except TypeError as e1:
@@ -70,8 +69,8 @@ def InvGamma(X: np.uint8) -> np.uint8:
     try:
         if m != 4 or n != 4:
             raise TypeError("Each block must be a 4x4 matrix of binary values.")
-        elif X.max() > 3 or X.min() < 0:
-            raise ValueError("Each element of the block must be a a value between 0 and 3.")
+        elif X.max() > 7 or X.min() < 0:
+            raise ValueError("Each element of the block must be a a value between 0 and 7.")
         else:
             Y = np.array([
                 [0, 0, 0, 0],
@@ -81,10 +80,8 @@ def InvGamma(X: np.uint8) -> np.uint8:
                 ], dtype = np.uint8)
             for i in range(0, 4):
                 for j in range(0, 4):
-                    inNum = X[i][j]
                     num = (i + j + 2) % 4
-                    outNum = SBOX(inNum, num)
-                    Y[i][j] = outNum
+                    Y[i][j] = SBOX(X[i][j], num)
             return Y.astype(np.uint8)
 
     except TypeError as e1:
@@ -101,13 +98,13 @@ def Pi(X: np.uint8) -> np.uint8:
     try:
         if m != 4 or n != 4:
             raise TypeError("Each block must be a 4x4 matrix of binary values.")
-        elif X.max() > 3 or X.min() < 0:
-            raise ValueError("Each element of the block must be a a value between 0 and 3.")
+        elif X.max() > 7 or X.min() < 0:
+            raise ValueError("Each element of the block must be a a value between 0 and 7.")
         else:
-            M = np.array([[0, 1],
-                          [1, 0],
-                          [1, 1],
-                          [1, 1]], dtype = np.uint8)
+            M = np.array([[1, 1, 0],
+                          [1, 0, 1],
+                          [0, 1, 1],
+                          [1, 1, 1]], dtype = np.uint8)
             Y = np.array([
                 [0, 0, 0, 0],
                 [0, 0, 0, 0],
@@ -116,17 +113,19 @@ def Pi(X: np.uint8) -> np.uint8:
                 ], dtype = np.uint8)
             for i in range(0, 4):
                 for j in range(0, 4):
-                    B1 = np.array([0, 0], dtype = np.uint8)
+                    B1 = np.array([0, 0, 0], dtype = np.uint8)
+                    B3 = np.array([0, 0, 0], dtype = np.uint8)
                     for l in range(0, 4):
                         t = (i + j + l) % 4
                         mask = M[t, :].copy()
                         B2 = Int2Crumb(X[l][j])
-                        B3 = np.array([0, 0], dtype = np.uint8)
                         B3[0] = np.uint8(B2[0] & mask[0])
                         B3[1] = np.uint8(B2[1] & mask[1])
+                        B3[2] = np.uint8(B2[2] & mask[2])
                         B1[0] = np.uint8(B1[0] ^ B3[0])
                         B1[1] = np.uint8(B1[1] ^ B3[1])
-                    Y[i][j] = np.uint8(B1[0] * 2 + B1[1])
+                        B1[2] = np.uint8(B1[2] ^ B3[2])
+                    Y[i][j] = np.uint8(B1[0] * 4 + B1[1] * 2 + B1[2])
             return Y.astype(np.uint8)
 
     except TypeError as e1:
@@ -143,8 +142,8 @@ def Tau(X: np.uint8) -> np.uint8:
     try:
         if m != 4 or n != 4:
             raise TypeError("Each block must be a 4x4 matrix of binary values.")
-        elif X.max() > 3 or X.min() < 0:
-            raise ValueError("Each element of the block must be a binary value.")
+        elif X.max() > 7 or X.min() < 0:
+            raise ValueError("Each element of the block must be a between 0 and 7.")
         else:
             Y = np.array([
                 [0, 0, 0, 0],
@@ -171,8 +170,8 @@ def PiStar(X: np.uint8) -> np.uint8:
     try:
         if m != 4 or n != 4:
             raise TypeError("Each block must be a 4x4 matrix of binary values.")
-        elif X.max() > 3 or X.min() < 0:
-            raise ValueError("Each element of the block must be a binary value.")
+        elif X.max() > 7 or X.min() < 0:
+            raise ValueError("Each element of the block must be between 0 and 7.")
         else:
             V = Tau(X)
             W = Pi(V)
@@ -195,8 +194,8 @@ def Sigma(X: np.uint8, K: np.uint8) -> np.uint8:
     try:
         if m != 4 or n != 4 or p != 4 or q != 4:
             raise TypeError("Inputs must be 4x4 matrices of binary values.")
-        elif X.max() > 3 or X.min() < 0 or K.max() > 3 or K.min() < 0:
-            raise ValueError("Either input block or input key is not a binary array.")
+        elif X.max() > 7 or X.min() < 0 or K.max() > 7 or K.min() < 0:
+            raise ValueError("Either input block or input key must be a matrix containing integers between 0 and 7.")
         else:
             Y = np.array([
                 [0, 0, 0, 0],
@@ -224,8 +223,8 @@ def SigmaSt(X: np.uint8, K: np.uint8) -> np.uint8:
     try:
         if m != 4 or n != 4 or p != 4 or q != 4:
             raise TypeError("Inputs must be 4x4 matrices of binary values.")
-        elif X.max() > 3 or X.min() < 0 or K.max() > 3 or K.min() < 0:
-            raise ValueError("Either input block or input key is not a binary array.")
+        elif X.max() > 7 or X.min() < 0 or K.max() > 7 or K.min() < 0:
+            raise ValueError("Either input block or input key must be a matrix containing integers between 0 and 7.")
         else:
             kt = Tau(K)
             kSt = Pi(kt)
@@ -247,8 +246,8 @@ def RF(X: np.uint8, K: np.uint8) -> np.uint8:
     try:
         if m != 4 or n != 4 or p != 4 or q != 4:
             raise TypeError("Inputs must be 4x4 matrices of binary values.")
-        elif X.max() > 3 or X.min() < 0 or K.max() > 3 or K.min() < 0:
-            raise ValueError("Either input block or input key is not a binary array.")
+        elif X.max() > 7 or X.min() < 0 or K.max() > 7 or K.min() < 0:
+            raise ValueError("Either input block or input key must be a matrix containing integers between 0 and 7.")
         else:
             Z = Gamma(X)
             W = Pi(Z)
@@ -271,8 +270,8 @@ def LastRF(X: np.uint8, K: np.uint8) -> np.uint8:
     try:
         if m != 4 or n != 4 or p != 4 or q != 4:
             raise TypeError("Inputs must be 4x4 matrices of nibbles.")
-        elif X.max() > 3 or X.min() < 0 or K.max() > 3 or K.min() < 0:
-            raise ValueError("Either input block or input key is not a binary array.")
+        elif X.max() > 7 or X.min() < 0 or K.max() > 7 or K.min() < 0:
+            raise ValueError("Either input block or input key must be a matrix containing integers between 0 and 7.")
         else:
             Z = Gamma(X)
             W = SigmaSt(Z, K)

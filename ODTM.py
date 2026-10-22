@@ -1,6 +1,8 @@
 import numpy as np
 import Basic as Bsc
+import KS_Operators as KS_Op
 import Encryption as Enc
+from RF_Operators import Pi, Tau
 
 """
 Instruction:
@@ -144,10 +146,10 @@ def ODTM_Generate(Address: str) -> list:
             outNum2 = 4 * outNum2 + (temp[1] - outNum3) // 4
             outNum4 = temp[2] % 8
             outNum3 = 2 * outNum3 + (temp[2] - outNum4) // 8
-            MK[i, 0] = outNum1
-            MK[i, 1] = outNum2
-            MK[i, 2] = outNum3
-            MK[i, 3] = outNum4
+            MK[i][0] = outNum1
+            MK[i][1] = outNum2
+            MK[i][2] = outNum3
+            MK[i][3] = outNum4
         flag = True
         for i in range(0, N):
             X = Enc.Enc(ptxList[i], MK, 6)
@@ -162,3 +164,50 @@ def ODTM_Generate(Address: str) -> list:
                 continue
         WriteDoc(ctxList, Address)
         return ctxList
+
+###################################################################################################
+####   Extracting the RK* of the 6th round of nanocrypton (side info for fast key recovery)    ####
+###################################################################################################
+def RKst6Ext(Address: str) -> np.uint8:
+    rkSt7 = np.array([0, 0, 0, 0], dtype = np.uint8)
+    MK = np.array([
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0]
+        ], dtype = np.uint8)
+    Address1 = Address + "\\MasterKey.txt"
+    with open(Address1, "r") as f:
+        Data = f.read()
+        f.close()
+    Len = len(Data)
+    if Len != 14 or (Len == 15 and Data[14] != "\n"):
+        raise ValueError("Master key has not been eneterd properly in the MasterKey.txt file. Please renter it properly.")
+    else:
+        for i in range(0, 4):
+            temp = []
+            for j in range(0, 3):
+                y = Data[2 + i * 3 + j]
+                if ord(y) > 57:
+                    t = np.uint8(ord(y) - 87)
+                else:
+                    t = np.uint8(ord(y) - 48)
+                temp.append(t)
+            outNum2 = temp[0] % 2
+            outNum1 = (temp[0] - outNum2) // 2
+            outNum3 = temp[1] % 4
+            outNum2 = 4 * outNum2 + (temp[1] - outNum3) // 4
+            outNum4 = temp[2] % 8
+            outNum3 = 2 * outNum3 + (temp[2] - outNum4) // 8
+            MK[i][0] = outNum1
+            MK[i][1] = outNum2
+            MK[i][2] = outNum3
+            MK[i][3] = outNum4
+        KS = MK.copy()
+        for i in range(1, 7):
+            KS = KS_Op.Updt(KS)
+        RK6 = KS_Op.Ext(KS, 6)
+        rkT = Tau(RK6)
+        rkSt6 = Pi(rkT)
+        vec = rkSt6[0, :]
+        return vec

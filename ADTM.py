@@ -299,15 +299,14 @@ def ADTM_Generate(Address: str) -> list:
 ###################################################################################################
 ####                                    Partial Decryption                                     ####
 ###################################################################################################
-def PartDec(hashTable: list, ctxList: list, columnNum: int) -> list:
+def PartDec(Address: str, hashTable: list, ctxList: list, columnNum: int) -> list:
     try:
         if type(hashTable) != list or type(ctxList) != list or type(columnNum) != int:
-            raise TypeError("The first and second inputs must be valid lists and the last input must be an integer number.")
+            raise TypeError("The second and third inputs must be valid lists and the last input must be an integer number.")
         elif columnNum > 3 or columnNum < 0:
             raise ValueError("The last input is out of range. It must be an integer between 0 and 3.")
         else:
             keyVec = []
-            keyList = np.ones((4096, 4), dtype = np.uint8)
             C = np.array([[0, 0, 0, 0],
                           [0, 0, 0, 0],
                           [0, 0, 0, 0],
@@ -322,16 +321,33 @@ def PartDec(hashTable: list, ctxList: list, columnNum: int) -> list:
             W = X.copy()
             V = X.copy()
             T = X.copy()
+            """
+            Since during partial decryption 167777216 keys are being sieved, the process needs a lot of time.
+            For checking the soundness and completeness of the cryptanalysis in a short time it is possible to fix the 12 bits of RK6 and only sieve the 4096 possible RK0.
+            In order to fix 12 bits of RK6 the commneted cheat codes have been added to the lines {330,...,336,347, ...,350}, please commnet them and uncomment commands in lines {329,343,...,346}.
+            """
+            keyList = np.ones((4096, 4096), dtype = np.uint8)
+            #from ODTM import RKst6Ext
+            #keyList = np.ones((4096, 1), dtype = np.uint8)
+            #rkSt6 = RKst6Ext(Address)
+            #rk6Num0 = int(rkSt6[0])
+            #rk6Num1 = int(rkSt6[1])
+            #rk6Num2 = int(rkSt6[2])
+            #rk6Num3 = int(rkSt6[3])
             if Len % 8 != 0:
                 raise ValueError("Hash table has not been filled properly.")
             else:
                 N = Len // 8
                 for i in range(0, 4096):
                     ctr = 0
-                    for k0 in range(3, 4):
-                        for k1 in range(5, 6):
-                            for k2 in range(0, 2):
-                                for k3 in range(6, 8):
+                    for k0 in range(0, 8):
+                        for k1 in range(0, 8):
+                            for k2 in range(0, 8):
+                                for k3 in range(0, 8):
+                    #for k0 in range(rk6Num0, rk6Num0 + 1):
+                        #for k1 in range(rk6Num1, rk6Num1 + 1):
+                            #for k2 in range(rk6Num2, rk6Num2 + 1):
+                                #for k3 in range(rk6Num3, rk6Num3 + 1):
                                     keyFlag = False
                                     for j in range(0, N):
                                         temp = np.zeros((8, 4), dtype = np.uint8)
@@ -377,11 +393,11 @@ def PartDec(hashTable: list, ctxList: list, columnNum: int) -> list:
                                             break
                                     ctr += 1
                             y = round(100 * (i * 64 + 8 * k0 + k1) / 64 / 4096, 2)
-                            if columnNum == 3:
+                            if columnNum == 0:
                                 print(f"ADTM: {y}% of the first phase of partial decryption has been completed.")
-                            elif columnNum == 2:
-                                print(f"ADTM: {y}% of the second phase of partial decryption has been completed.")
                             elif columnNum == 1:
+                                print(f"ADTM: {y}% of the second phase of partial decryption has been completed.")
+                            elif columnNum == 2:
                                 print(f"ADTM: {y}% of the third phase of partial decryption has been completed.")
                             else:
                                 print(f"ADTM: {y}% of the last phase of partial decryption has been completed.")
@@ -397,24 +413,19 @@ def PartDec(hashTable: list, ctxList: list, columnNum: int) -> list:
         print("Error: Invalid inputs.", e2)
 
 ###################################################################################################
-####                           Conerting whitening key to master key                           ####
+####                          Converting whitening key to master key                           ####
 ###################################################################################################
 def WK2MK(keyList: list, columnNum: int) -> list:
     try:
         if type(keyList) != list or type(columnNum) != int:
             raise TypeError("The first input must be a list and the second input must be an integer between 0 and 3.")
-        elif columnNum > 0 or columnNum < 3:
+        elif columnNum < 0 or columnNum > 3:
             raise ValueError("Second input is out of range. It must be an integer between 0 and 3.")
         else:
             Len = len(keyList)
             mkList = []
             MK = np.array([0, 0, 0, 0], dtype = np.uint8)
             WK = MK.copy()
-            WK[3] = np.uint8(keyList[i] % 8)
-            WK[0] = np.uint8(keyList[i] // 512)
-            temp = (keyList[i] - 512 * int(WK[0]) - int(WK[3])) // 8
-            WK[2] = np.uint8(temp % 8)
-            WK[1] = np.uint8(temp // 8)
             if columnNum == 3:
                 RootS0 = []
                 RootS0.append([])
@@ -432,16 +443,21 @@ def WK2MK(keyList: list, columnNum: int) -> list:
                 RootS0.append(vec.copy())
             index = (columnNum + 1) % 4
             for i in range(0, Len):
+                WK[3] = np.uint8(keyList[i] % 8)
+                WK[0] = np.uint8(keyList[i] // 512)
+                temp = (keyList[i] - 512 * int(WK[0]) - int(WK[3])) // 8
+                WK[2] = np.uint8(temp % 8)
+                WK[1] = np.uint8(temp // 8)
                 for j in range(0, 4):
                     index2 = (j - 1) % 4
                     MK[j] = WK[index2]
                 if columnNum != 3:
-                    MK[index] = Bsc.CrumbXOR(MK[index], 1)
-                    MK[index] = Bsc.CrumbXOR(MK[index], RF_Op.SBOX(MK[0]))
+                    MK[index] = Bsc.CrumbXOR(MK[index], np.uint8(1))
+                    MK[index] = Bsc.CrumbXOR(MK[index], RF_Op.SBOX(MK[0], 0))
                     num = 512 * int(MK[0]) + 64 * int(MK[1]) + 8 * int(MK[2]) + int(MK[3])
                     mkList.append(num)
                 else:
-                    MK[0] = Bsc.CrumbXOR(MK[0], 1)
+                    MK[0] = Bsc.CrumbXOR(MK[0], np.uint8(1))
                     vec = RootS0[MK[0]]
                     Len2 = len(vec)
                     for l in range(0, Len2):
@@ -487,15 +503,15 @@ def Search(ptxVec: list, ctxVec: list, keyList1: list, keyList2: list, keyList3:
                     MK[2][1] = np.uint8(temp % 8)
                     MK[1][1] = np.uint8(temp // 8)
                     for k in range(0, Len3):
-                        MK[3][2] = np.uint8(keyList2[k] % 8)
-                        MK[0][2] = np.uint8(keyList2[k] // 512)
-                        temp = (keyList2[k] - 512 * int(MK[0][2]) - int(MK[3][2])) // 8
+                        MK[3][2] = np.uint8(keyList3[k] % 8)
+                        MK[0][2] = np.uint8(keyList3[k] // 512)
+                        temp = (keyList3[k] - 512 * int(MK[0][2]) - int(MK[3][2])) // 8
                         MK[2][2] = np.uint8(temp % 8)
                         MK[1][2] = np.uint8(temp // 8)
                         for l in range(0, Len4):
-                            MK[3][3] = np.uint8(keyList3[l] % 8)
-                            MK[0][3] = np.uint8(keyList3[l] // 512)
-                            temp = (keyList3[l] - 512 * int(MK[0][3]) - int(MK[3][3])) // 8
+                            MK[3][3] = np.uint8(keyList4[l] % 8)
+                            MK[0][3] = np.uint8(keyList4[l] // 512)
+                            temp = (keyList4[l] - 512 * int(MK[0][3]) - int(MK[3][3])) // 8
                             MK[2][3] = np.uint8(temp % 8)
                             MK[1][3] = np.uint8(temp // 8)
                             C0 = Enc.Enc(ptxVec[0], MK, 6)
@@ -506,11 +522,11 @@ def Search(ptxVec: list, ctxVec: list, keyList1: list, keyList2: list, keyList3:
                                 temp = RF_Op.Sigma(C1, ctxVec[1])
                                 w1 = np.sum(temp)
                                 if w1 == 0:
+                                    keyString = "0x"
                                     for n in range(0, 4):
-                                        num1 = (MK[n][2] % 2) * 8 + MK[n][3]
-                                        num3 = MK[n][0] * 2 + (MK[n][1] // 4)
+                                        num3 = (MK[n][2] % 2) * 8 + MK[n][3]
+                                        num1 = MK[n][0] * 2 + (MK[n][1] // 4)
                                         num2 = (MK[n][1] % 4) * 4 + int(MK[n][2] // 2)
-                                        keyString = "0x"
                                         keyString += hexList[num1] 
                                         keyString += hexList[num2]
                                         keyString += hexList[num3]
@@ -524,19 +540,13 @@ def Search(ptxVec: list, ctxVec: list, keyList1: list, keyList2: list, keyList3:
                         if recoveryFlag == True:
                             break
                         else:
+                            y = round(100 * (Len3 * Len2 * i + Len3 * j + k) / Len1 / Len2 / Len3, 3)
+                            print(f"ADTM: {y}% of the final search has been completed.")
                             continue
                     if recoveryFlag == True:
                         break
                     else:
-                        flag = True
-                        y = round(100 * (Len2 *i + j) / Len1 / Len2, 3)
-                        if abs(y - round(y)) < 0.05 and flag == True:
-                            print(f"ADTM: {y}% of the final search has been completed.")
-                            flag = False
-                        elif abs(y - round(y)) >= 0.05:
-                            flag = True
-                        else:
-                            continue
+                        continue
                 if recoveryFlag == True:
                     break
                 else:
